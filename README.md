@@ -5,6 +5,7 @@
 ![Springdoc OpenAPI](https://img.shields.io/badge/Springdoc%20OpenAPI-3.0.2-orange)
 ![H2](https://img.shields.io/badge/H2-en%20memoria-lightgrey)
 ![JaCoCo](https://img.shields.io/badge/Cobertura%20mínima-80%25-success)
+![Docker](https://img.shields.io/badge/Docker-Hub-blue?logo=docker)
 
 Microservicio RESTful de gestión de productos desarrollado con **Spring Boot 4** y **Java 25**. Expone una API CRUD completa documentada con **OpenAPI 3 / Swagger UI**, siguiendo una arquitectura presentation-domain-data alineada a las prácticas actuales de microservicios.
 
@@ -22,6 +23,7 @@ Microservicio RESTful de gestión de productos desarrollado con **Spring Boot 4*
 - [Tests](#tests)
 - [Cobertura de código](#cobertura-de-código)
 - [Configuración](#configuración)
+- [CI/CD](#cicd)
 
 ---
 
@@ -203,7 +205,7 @@ JaCoCo está configurado con umbrales mínimos de cobertura que se validan en la
 | Líneas   | 80 %          |
 | Ramas    | 60 %          |
 
-El reporte en formato XML se genera en `target/site/jacoco/jacoco.xml`, compatible con herramientas de análisis estático como SonarQube.
+El reporte en formato XML se genera en `target/site/jacoco/jacoco.xml`, compatible con SonarQube.
 
 ---
 
@@ -222,3 +224,64 @@ Todas las propiedades se encuentran en `src/main/resources/application.yaml`.
 | `springdoc.swagger-ui.path`                      | `/swagger-ui.html`  | Ruta de la interfaz Swagger UI                                   |
 | `management.endpoints.web.exposure.include`      | `health, info`      | Endpoints de Actuator expuestos                                  |
 | `management.endpoint.health.show-details`        | `always`            | Detalle completo en el health check                              |
+
+---
+
+## CI/CD
+
+El pipeline está implementado con **Jenkins declarativo** + **Docker agents**. Cada stage corre en su propio contenedor aislado; el workspace del host es compartido entre stages Maven mediante `skipDefaultCheckout()`.
+
+### Pipeline — stages
+
+```
+Build → Test → Coverage → Package → Sonar → Docker
+```
+
+| Stage      | Agent Docker                        | Comando Maven                    | Propósito                                      |
+|------------|-------------------------------------|----------------------------------|------------------------------------------------|
+| Build      | `maven:3.9-eclipse-temurin-25`      | `mvn clean compile`              | Falla rápido ante errores de compilación       |
+| Test       | `maven:3.9-eclipse-temurin-25`      | `mvn test`                       | Ejecuta los 43 tests y publica resultados JUnit|
+| Coverage   | `maven:3.9-eclipse-temurin-25`      | `mvn jacoco:report`              | Genera el reporte XML de cobertura             |
+| Package    | `maven:3.9-eclipse-temurin-25`      | `mvn package -DskipTests`        | Produce el FAT JAR y lo archiva en Jenkins     |
+| Sonar      | `maven:3.9-eclipse-temurin-25`      | `mvn sonar:sonar`                | Análisis de calidad y cobertura en SonarQube   |
+| Docker     | `docker:29.4.0-cli`                 | `docker build` + `docker push`   | Publica la imagen en DockerHub                 |
+
+El stage Docker usa **DooD** (Docker outside of Docker) montando el socket del host (`/var/run/docker.sock`), sin correr como root.
+
+La imagen publicada en DockerHub es:
+
+```
+edsonmgoz/products-microservice:{version}
+edsonmgoz/products-microservice:latest
+```
+
+### Credenciales requeridas en Jenkins
+
+Antes de ejecutar el pipeline, deben existir las siguientes credenciales en **Jenkins → Manage Jenkins → Credentials**.
+
+#### 1. `dockerhub-credentials`
+
+Permite al stage Docker autenticarse en DockerHub para hacer `docker push`.
+
+| Campo      | Valor                              |
+|------------|------------------------------------|
+| Tipo       | **Username with password**         |
+| ID         | `dockerhub-credentials`            |
+| Username   | `edsonmgoz`                        |
+| Password   | Token de acceso de DockerHub       |
+
+Para generar el token en DockerHub: **Account Settings → Personal access tokens → Generate new token** (permisos: `Read & Write`).
+
+#### 2. `sonar-token`
+
+Permite al stage Sonar autenticarse en el servidor SonarQube. El `sonar-maven-plugin 4.x` lo lee automáticamente desde la variable de entorno `SONAR_TOKEN`.
+
+| Campo      | Valor                              |
+|------------|------------------------------------|
+| Tipo       | **Secret text**                    |
+| ID         | `sonar-token`                      |
+| Secret     | Token de usuario de SonarQube      |
+
+Para generar el token en SonarQube: **Mi cuenta → Security → Generate token** (tipo: `User Token`).
+
+> El servidor SonarQube también debe estar configurado en **Jenkins → Manage Jenkins → System → SonarQube servers** con el nombre `sonarqube` y la URL del servidor.
