@@ -84,7 +84,7 @@ pipeline {
                                 -Dsonar.pullrequest.base=${env.CHANGE_TARGET}
                             """
                         } else {
-                            def branchName = GIT_BRANCH.replaceFirst('^origin/', '')
+                            def branchName = (env.GIT_BRANCH ?: 'master').replaceFirst('^origin/', '')
                             println "Branch name: ${branchName}"
                             sh "mvn sonar:sonar -B -ntp -Dsonar.branch.name=${branchName}"
                         }
@@ -118,11 +118,11 @@ pipeline {
                     }
                 }
             }
-        }
-    }
-    post {
-        cleanup {
-            cleanWs()
+            post {
+                always {
+                    cleanWs()
+                }
+            }
         }
     }
 }
