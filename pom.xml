@@ -18,6 +18,9 @@
 		<java.version>25</java.version>
 		<springdoc.version>3.0.2</springdoc.version>
 		<maven.jacoco-plugin.version>0.8.14</maven.jacoco-plugin.version>
+		<sonar.projectKey>dev.edsonmm:products-microservice</sonar.projectKey>
+		<sonar.projectName>Products Microservice</sonar.projectName>
+		<sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
 	</properties>
 
 	<dependencies>

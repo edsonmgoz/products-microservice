@@ -1,0 +1,15 @@
+.mvn/
+src/
+.git/
+.gitignore
+mvnw
+mvnw.cmd
+*.md
+CLAUDE.md
+HELP.md
+target/classes/
+target/generated-sources/
+target/generated-test-sources/
+target/surefire-reports/
+target/test-classes/
+target/site/
